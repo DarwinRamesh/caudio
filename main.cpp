@@ -31,7 +31,7 @@ struct playerCtlRender{
 	bool noMusic = false;
 };
 
-void renderGui(int sw, int sh, playerCtlRender& pctl, Mus& m); 
+void renderGui(int sw, int sh, playerCtlRender& pctl, Mus& m, const char* trackTitle); 
 void updateState(float* ptr_sw, float* ptr_sh, Mus& m, playerCtlRender& pctl);
 int playSingleTrack(const char* trackDir, Mus& m);
 
@@ -47,12 +47,14 @@ int main(int argc, char *argv[]){
 	float* ptr_sh = &sh;
 
 	const char* trackDir = argv[1];
+	const char* trackTitle = argv[1];
+	trackTitle = GetFileNameWithoutExt(trackTitle);
 
 	Mus mus;
 	playerCtlRender pctl;
 
 	InitWindow(init_sw, init_sh, "Caudio - A C++ music player!");
-	GuiLoadStyle("style_candy.rgs");
+	GuiLoadStyle("style_cherry.rgs");
 	SetWindowState(FLAG_WINDOW_RESIZABLE);
 	SetTargetFPS(0);
 	InitAudioDevice();
@@ -67,7 +69,7 @@ int main(int argc, char *argv[]){
 	while(!WindowShouldClose()){
 		updateState(ptr_sw, ptr_sh, mus, pctl);
 		BeginDrawing();
-			renderGui(sw, sh, pctl, mus);
+			renderGui(sw, sh, pctl, mus, trackTitle);
 		EndDrawing();
 	}
 	CloseWindow();
@@ -79,6 +81,7 @@ void updateState(float* ptr_sw, float* ptr_sh, Mus& m, playerCtlRender& pctl){
 
 	*ptr_sw = current_sw;
 	*ptr_sh = current_sh;
+
 	if(pctl.isPaused == true && pctl.noMusic == false){
 		PauseMusicStream(m.currentTrack);
 	}
@@ -96,9 +99,21 @@ void updateState(float* ptr_sw, float* ptr_sh, Mus& m, playerCtlRender& pctl){
 	m.timeElapsed = GetMusicTimePlayed(m.currentTrack);
 	m.trackLength = GetMusicTimeLength(m.currentTrack);
 	m.percentagePlayed = (m.timeElapsed / m.trackLength)*100;
+
+	if(IsKeyPressed(KEY_H)){
+		if(m.timeElapsed < 6){
+			SeekMusicStream(m.currentTrack, 0);
+		}
+		else{
+			SeekMusicStream(m.currentTrack, m.timeElapsed - 5);
+		}
+	}
+	if(IsKeyPressed(KEY_L)){
+		SeekMusicStream(m.currentTrack, m.timeElapsed +5);
+	}
 }
 
-void renderGui(int sw, int sh, playerCtlRender& pctl, Mus& m){
+void renderGui(int sw, int sh, playerCtlRender& pctl, Mus& m, const char* trackTitle){
 	m.elapsedMins = (int)m.timeElapsed / 60;
 	m.elapsedSecs = (int)m.timeElapsed % 60;
 	m.totalMins = (int)m.trackLength / 60;
@@ -115,12 +130,11 @@ void renderGui(int sw, int sh, playerCtlRender& pctl, Mus& m){
 
 	GuiPanel(panel, "");
 	GuiStatusBar(pctl.lowerStatusBounds, "");
-	GuiStatusBar(statusBounds, TextFormat("Now playing - %s", m.currentTrack));
+	GuiStatusBar(statusBounds, TextFormat("Now playing - %s", trackTitle));
 	GuiToggle(pctl.pauseButtonBounds, "P", &pctl.isPaused);
 	GuiSlider(pctl.sliderBounds, "0", "100", &m.musicVolume, 0.0f, 1.0f);
-		GuiSliderBar(pctl.progressBarBounds, TextFormat("%d:%02d", m.elapsedMins, m.elapsedSecs), TextFormat("%d:%02d", m.totalMins, m.totalSecs), &m.percentagePlayed, 0.00f, 100.00f);
-
-
+	GuiProgressBar(pctl.progressBarBounds, TextFormat("%d:%02d", m.elapsedMins, m.elapsedSecs),
+			TextFormat("%d:%02d", m.totalMins, m.totalSecs), &m.percentagePlayed, 0.00f, 100.00f);
 	if(GuiButton(closeButtonBounds, "X")){
 		CloseWindow();
 	}
@@ -137,4 +151,3 @@ int playSingleTrack(const char* trackDir, Mus& m){
 	PlayMusicStream(m.currentTrack);
 	return 0;
 }
-
