@@ -54,7 +54,7 @@ int main(int argc, char *argv[]){
 	playerCtlRender pctl;
 
 	InitWindow(init_sw, init_sh, "Caudio - A C++ music player!");
-	GuiLoadStyle("style_cherry.rgs");
+	GuiLoadStyle("style_dark.rgs");
 	SetWindowState(FLAG_WINDOW_RESIZABLE);
 	SetTargetFPS(0);
 	InitAudioDevice();
