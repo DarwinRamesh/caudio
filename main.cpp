@@ -1,18 +1,21 @@
 #include "raylib.h"
-#include <string>
 
 #define RAYGUI_IMPLEMENTATION
 #include "raygui.h"
 
 struct Mus{
 	Music currentTrack;
-	float musicVolume = 0.00f;
+	float musicVolume = 0.5f;
+	float timeElapsed = 0.00f;
+	float trackLength = 0.00f;
+	float percentagePlayed = 0.00f;
 };
 
 struct playerCtlRender{
 	Rectangle lowerStatusBounds;
 	Rectangle pauseButtonBounds;
 	Rectangle sliderBounds;
+	Rectangle progressBarBounds;
 	bool isPaused = false;
 };
 
@@ -36,18 +39,21 @@ int main(int argc, char *argv[]){
 	Mus mus;
 	playerCtlRender pctl;
 
-	InitWindow(init_sw, init_sh, "Debug");
+	InitWindow(init_sw, init_sh, "Caudio");
 	SetWindowState(FLAG_WINDOW_RESIZABLE);
 	SetTargetFPS(0);
 	InitAudioDevice();
-	playSingleTrack(trackDir, mus);
+
+	if(argv[1] != NULL){
+		playSingleTrack(trackDir, mus);
+	}
 
 	while(!WindowShouldClose()){
 		updateState(ptr_sw, ptr_sh, mus, pctl);
 		BeginDrawing();
 			ClearBackground(WHITE);
 			renderGui(sw, sh, pctl, mus);
-			DrawText(argv[1], 50, 50, 12, BLACK);
+			DrawText(TextFormat("> %s", argv[1]), 50, 50, 12, BLACK);
 		EndDrawing();
 	}
 	CloseWindow();
@@ -67,6 +73,10 @@ void updateState(float* ptr_sw, float* ptr_sh, Mus& m, playerCtlRender& pctl){
 	}
 	UpdateMusicStream(m.currentTrack);
 	SetMusicVolume(m.currentTrack, m.musicVolume);
+	
+	m.timeElapsed = GetMusicTimePlayed(m.currentTrack);
+	m.trackLength = GetMusicTimeLength(m.currentTrack);
+	m.percentagePlayed = (m.timeElapsed / m.trackLength)*100;
 }
 
 void renderGui(int sw, int sh, playerCtlRender& pctl, Mus& m){
@@ -75,12 +85,14 @@ void renderGui(int sw, int sh, playerCtlRender& pctl, Mus& m){
 	Rectangle maximizeButtonBounds = {(float)sw - 58, 0, 30, 30};
 	pctl.sliderBounds = {((float)sw) - 160, ((float)sh) - 60, 120, 60 };
 	pctl.lowerStatusBounds = {0, (float)sh - 60, (float)sw, 60};
-	pctl.pauseButtonBounds = {((float)sw / 2.0f) - 15, (float)sh - 60, 60, 60};
+	pctl.pauseButtonBounds = {((float)sw / 2.0f) - 180, (float)sh - 60, 60, 60};
+	pctl.progressBarBounds = {((float)sw) / 2.0f - 10, (float)sh - 60, 145, 60};
 
-	GuiStatusBar(pctl.lowerStatusBounds, "test");
+	GuiStatusBar(pctl.lowerStatusBounds, "");
 	GuiStatusBar(statusBounds, "Status Bar");
 	GuiToggle(pctl.pauseButtonBounds, "P", &pctl.isPaused);
 	GuiSlider(pctl.sliderBounds, "0", "100", &m.musicVolume, 0.0f, 1.0f);
+	GuiSliderBar(pctl.progressBarBounds, TextFormat("%.2f", m.timeElapsed), TextFormat("%.2f", m.trackLength), &m.percentagePlayed, 0.00f, 100.00f);
 
 	if(GuiButton(closeButtonBounds, "X")){
 		CloseWindow();
