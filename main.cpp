@@ -41,14 +41,15 @@ struct screenDimensions{
 struct ioState{
 	int btnActive = -1;
 	char textInput[256] = {0};
-	char* targetDir = {0};
+	char targetDir[256] = {0};
 	int scrollIndex = 0;
 	int itemActive = -1;
 	int itemFocused = -1;
+	int prevItemActive = -1;
 };
 
 void renderGui(FilePathList& fl, ioState& io, screenDimensions&, playerCtlRender& pctl, Mus& m, const char* trackTitle); 
-void updateState(ioState& io, screenDimensions& sd, Mus& m, playerCtlRender& pctl);
+void updateState(FilePathList& fl, ioState& io, screenDimensions& sd, Mus& m, playerCtlRender& pctl);
 int playSingleTrack(const char* trackDir, Mus& m);
 void crawlDir(ioState& io, FilePathList& fl);
 
@@ -64,6 +65,8 @@ int main(int argc, char *argv[]){
 	Mus mus;
 	playerCtlRender pctl;
 	FilePathList fl;
+	fl.paths = {0};
+	fl.count = {0};
 
 	InitWindow(sd.init_sw, sd.init_sh, "Caudio - A C++ music player!");
 	GuiLoadStyle("style_dark.rgs");
@@ -74,13 +77,11 @@ int main(int argc, char *argv[]){
 	if(argv[1] != NULL){
 		playSingleTrack(trackDir, mus);
 	}else{
-		CloseAudioDevice();
 		pctl.noMusic = true;
 	}
 
 	while(!WindowShouldClose()){
-		updateState(io, sd, mus, pctl);
-		crawlDir(io, fl);
+		updateState(fl, io, sd, mus, pctl);
 		BeginDrawing();
 			renderGui(fl, io, sd, pctl, mus, trackTitle);
 		EndDrawing();
@@ -88,7 +89,7 @@ int main(int argc, char *argv[]){
 	CloseWindow();
 }
 
-void updateState(ioState& io, screenDimensions& sd, Mus& m, playerCtlRender& pctl){
+void updateState(FilePathList& fl, ioState& io, screenDimensions& sd, Mus& m, playerCtlRender& pctl){
 	sd.sw = GetRenderWidth();
 	sd.sh = GetRenderHeight();
 
@@ -99,18 +100,25 @@ void updateState(ioState& io, screenDimensions& sd, Mus& m, playerCtlRender& pct
 		ResumeMusicStream(m.currentTrack);
 	}
 
-	if(pctl.noMusic == true){
-		return;
-	}
-
 	if(io.btnActive == 1){
-		TraceLog(1, "State 1");
+		crawlDir(io, fl);	
 	}
 	if(io.btnActive == 0){
 		TraceLog(1, "State 0");
 	}
 	if(io.btnActive == -1){
 		TraceLog(1, "State -1");
+	}
+	if(io.itemActive != io.prevItemActive){
+    		io.prevItemActive = io.itemActive;
+    			if(io.itemActive >= 0 && io.itemActive < fl.count){
+        			if(!pctl.noMusic) UnloadMusicStream(m.currentTrack);
+        	playSingleTrack(fl.paths[io.itemActive], m);
+        	pctl.noMusic = false;
+    		}
+	}
+	if(pctl.noMusic == true){
+		return;
 	}
 
 	UpdateMusicStream(m.currentTrack);
@@ -145,7 +153,7 @@ void renderGui(FilePathList& fl, ioState& io, screenDimensions& sd, playerCtlRen
 	Rectangle panel = {(float)0, (float)5, (float)sd.sw, ((float)sd.sh - 30)};
 	Rectangle textBoxBounds{(float)0, (float)29, (float)300, (float)sd.sh - 85};
 	Rectangle listViewBounds = {(float)300, (float)29, ((float)sd.sw)-300, (float)sd.sh - 85};
-	pctl.sliderBounds = {pctl.bx_padding + (pctl.bx_spacing * 5), ((float)sd.sh) - pctl.by_padding, pctl.sx, pctl.sy };
+	pctl.sliderBounds = {pctl.bx_padding + (pctl.bx_spacing * 5) + 20, ((float)sd.sh) - pctl.by_padding, pctl.sx, pctl.sy };
 	pctl.lowerStatusBounds = {0, (float)sd.sh - 60, (float)sd.sw, 60};
 	pctl.pauseButtonBounds = {pctl.bx_padding, (float)sd.sh - pctl.by_padding, pctl.bx, pctl.by};
 	pctl.progressBarBounds = {pctl.bx_padding + (pctl.bx_spacing * 2), (float)sd.sh - pctl.by_padding, pctl.sx, pctl.sy};
@@ -169,8 +177,9 @@ void renderGui(FilePathList& fl, ioState& io, screenDimensions& sd, playerCtlRen
 }
 
 int playSingleTrack(const char* trackDir, Mus& m){
-	if(DirectoryExists(trackDir) == false){
+	if(FileExists(trackDir) == false){
 		TraceLog(1, "No valid directory provided as arg 1 to program call.");
+		return 1;
 	}
 	m.currentTrack = LoadMusicStream(trackDir);
 	PlayMusicStream(m.currentTrack);
@@ -178,7 +187,8 @@ int playSingleTrack(const char* trackDir, Mus& m){
 }
 
 void crawlDir(ioState& io, FilePathList& fl){
-	if(DirectoryExists(io.textInput) && io.btnActive == 1){
+	UnloadDirectoryFiles(fl);
+	if(DirectoryExists(io.textInput)){
 		TraceLog(1, "Valid Directory");
 		TextCopy(io.targetDir, io.textInput);
 		io.btnActive = -1;
@@ -188,4 +198,6 @@ void crawlDir(ioState& io, FilePathList& fl){
 
 	fl = LoadDirectoryFilesEx(io.textInput, ".mp3", 1);
 	TraceLog(1, TextFormat("%d", fl.count));
+
+	io.btnActive = -1;
 }
