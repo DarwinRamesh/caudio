@@ -31,32 +31,44 @@ struct playerCtlRender{
 	bool noMusic = false;
 };
 
-void renderGui(int sw, int sh, playerCtlRender& pctl, Mus& m, const char* trackTitle); 
-void updateState(float* ptr_sw, float* ptr_sh, Mus& m, playerCtlRender& pctl);
+struct screenDimensions{
+	int init_sw = 550;
+	int init_sh = 200;
+	float sw = 0.0f;
+	float sh = 0.0f;
+};
+
+struct ioState{
+	int btnActive = -1;
+	char textInput[256] = {0};
+	char* targetDir = {0};
+	int scrollIndex = 0;
+	int itemActive = -1;
+	int itemFocused = -1;
+};
+
+void renderGui(FilePathList& fl, ioState& io, screenDimensions&, playerCtlRender& pctl, Mus& m, const char* trackTitle); 
+void updateState(ioState& io, screenDimensions& sd, Mus& m, playerCtlRender& pctl);
 int playSingleTrack(const char* trackDir, Mus& m);
+void crawlDir(ioState& io, FilePathList& fl);
 
 int main(int argc, char *argv[]){
 	SetTraceLogLevel(1);
-	int init_sw = 550;
-	int init_sh = 200;
-
-	float sw = 0.0f;
-	float sh = 0.0f;
-
-	float* ptr_sw = &sw;
-	float* ptr_sh = &sh;
 
 	const char* trackDir = argv[1];
 	const char* trackTitle = argv[1];
 	trackTitle = GetFileNameWithoutExt(trackTitle);
-
+	
+	ioState io;
+	screenDimensions sd;
 	Mus mus;
 	playerCtlRender pctl;
+	FilePathList fl;
 
-	InitWindow(init_sw, init_sh, "Caudio - A C++ music player!");
+	InitWindow(sd.init_sw, sd.init_sh, "Caudio - A C++ music player!");
 	GuiLoadStyle("style_dark.rgs");
 	SetWindowState(FLAG_WINDOW_RESIZABLE);
-	SetTargetFPS(0);
+	SetTargetFPS(144);
 	InitAudioDevice();
 
 	if(argv[1] != NULL){
@@ -67,20 +79,18 @@ int main(int argc, char *argv[]){
 	}
 
 	while(!WindowShouldClose()){
-		updateState(ptr_sw, ptr_sh, mus, pctl);
+		updateState(io, sd, mus, pctl);
+		crawlDir(io, fl);
 		BeginDrawing();
-			renderGui(sw, sh, pctl, mus, trackTitle);
+			renderGui(fl, io, sd, pctl, mus, trackTitle);
 		EndDrawing();
 	}
 	CloseWindow();
 }
 
-void updateState(float* ptr_sw, float* ptr_sh, Mus& m, playerCtlRender& pctl){
-	float current_sw = GetRenderWidth();
-	float current_sh = GetRenderHeight();
-
-	*ptr_sw = current_sw;
-	*ptr_sh = current_sh;
+void updateState(ioState& io, screenDimensions& sd, Mus& m, playerCtlRender& pctl){
+	sd.sw = GetRenderWidth();
+	sd.sh = GetRenderHeight();
 
 	if(pctl.isPaused == true && pctl.noMusic == false){
 		PauseMusicStream(m.currentTrack);
@@ -91,6 +101,16 @@ void updateState(float* ptr_sw, float* ptr_sh, Mus& m, playerCtlRender& pctl){
 
 	if(pctl.noMusic == true){
 		return;
+	}
+
+	if(io.btnActive == 1){
+		TraceLog(1, "State 1");
+	}
+	if(io.btnActive == 0){
+		TraceLog(1, "State 0");
+	}
+	if(io.btnActive == -1){
+		TraceLog(1, "State -1");
 	}
 
 	UpdateMusicStream(m.currentTrack);
@@ -113,22 +133,27 @@ void updateState(float* ptr_sw, float* ptr_sh, Mus& m, playerCtlRender& pctl){
 	}
 }
 
-void renderGui(int sw, int sh, playerCtlRender& pctl, Mus& m, const char* trackTitle){
+void renderGui(FilePathList& fl, ioState& io, screenDimensions& sd, playerCtlRender& pctl, Mus& m, const char* trackTitle){
 	m.elapsedMins = (int)m.timeElapsed / 60;
 	m.elapsedSecs = (int)m.timeElapsed % 60;
 	m.totalMins = (int)m.trackLength / 60;
 	m.totalSecs = (int)m.trackLength % 60;
 
-	Rectangle statusBounds = {0, 0, (float)sw, (float)30};
-	Rectangle closeButtonBounds = {(float)sw - 30, 0, 30, 30};
-	Rectangle maximizeButtonBounds = {(float)sw - 58, 0, 30, 30};
-	Rectangle panel = {(float)0, (float)5, (float)sw, ((float)sh - 64)};
-	pctl.sliderBounds = {pctl.bx_padding + (pctl.bx_spacing * 5), ((float)sh) - pctl.by_padding, pctl.sx, pctl.sy };
-	pctl.lowerStatusBounds = {0, (float)sh - 60, (float)sw, 60};
-	pctl.pauseButtonBounds = {pctl.bx_padding, (float)sh - pctl.by_padding, pctl.bx, pctl.by};
-	pctl.progressBarBounds = {pctl.bx_padding + (pctl.bx_spacing * 2), (float)sh - pctl.by_padding, pctl.sx, pctl.sy};
+	Rectangle statusBounds = {0, 0, (float)sd.sw, (float)30};
+	Rectangle closeButtonBounds = {(float)sd.sw - 30, 0, 30, 30};
+	Rectangle maximizeButtonBounds = {(float)sd.sw - 58, 0, 30, 30};
+	Rectangle panel = {(float)0, (float)5, (float)sd.sw, ((float)sd.sh - 30)};
+	Rectangle textBoxBounds{(float)0, (float)29, (float)300, (float)sd.sh - 85};
+	Rectangle listViewBounds = {(float)300, (float)29, ((float)sd.sw)-300, (float)sd.sh - 85};
+	pctl.sliderBounds = {pctl.bx_padding + (pctl.bx_spacing * 5), ((float)sd.sh) - pctl.by_padding, pctl.sx, pctl.sy };
+	pctl.lowerStatusBounds = {0, (float)sd.sh - 60, (float)sd.sw, 60};
+	pctl.pauseButtonBounds = {pctl.bx_padding, (float)sd.sh - pctl.by_padding, pctl.bx, pctl.by};
+	pctl.progressBarBounds = {pctl.bx_padding + (pctl.bx_spacing * 2), (float)sd.sh - pctl.by_padding, pctl.sx, pctl.sy};
 
-	GuiPanel(panel, "");
+	ClearBackground(BLACK);
+	GuiListViewEx(listViewBounds, fl.paths, fl.count, &io.scrollIndex, &io.itemActive, &io.itemFocused);
+	GuiTextInputBox(textBoxBounds, "", "Enter the directory for your music here!", io.textInput, 256, "Ok;Cancel", &io.btnActive, NULL);
+	//GuiPanel(panel, "");
 	GuiStatusBar(pctl.lowerStatusBounds, "");
 	GuiStatusBar(statusBounds, TextFormat("Now playing - %s", trackTitle));
 	GuiToggle(pctl.pauseButtonBounds, "P", &pctl.isPaused);
@@ -150,4 +175,17 @@ int playSingleTrack(const char* trackDir, Mus& m){
 	m.currentTrack = LoadMusicStream(trackDir);
 	PlayMusicStream(m.currentTrack);
 	return 0;
+}
+
+void crawlDir(ioState& io, FilePathList& fl){
+	if(DirectoryExists(io.textInput) && io.btnActive == 1){
+		TraceLog(1, "Valid Directory");
+		TextCopy(io.targetDir, io.textInput);
+		io.btnActive = -1;
+	}else{
+		return;
+	}
+
+	fl = LoadDirectoryFilesEx(io.textInput, ".mp3", 1);
+	TraceLog(1, TextFormat("%d", fl.count));
 }
