@@ -46,6 +46,7 @@ struct ioState{
 	int itemActive = -1;
 	int itemFocused = -1;
 	int prevItemActive = -1;
+	const char* fileName = {0};
 };
 
 void renderGui(FilePathList& fl, ioState& io, screenDimensions&, playerCtlRender& pctl, Mus& m, const char* trackTitle); 
@@ -58,7 +59,6 @@ int main(int argc, char *argv[]){
 
 	const char* trackDir = argv[1];
 	const char* trackTitle = argv[1];
-	trackTitle = GetFileNameWithoutExt(trackTitle);
 	
 	ioState io;
 	screenDimensions sd;
@@ -163,7 +163,7 @@ void renderGui(FilePathList& fl, ioState& io, screenDimensions& sd, playerCtlRen
 	GuiTextInputBox(textBoxBounds, "", "Enter the directory for your music here!", io.textInput, 256, "Ok;Cancel", &io.btnActive, NULL);
 	//GuiPanel(panel, "");
 	GuiStatusBar(pctl.lowerStatusBounds, "");
-	GuiStatusBar(statusBounds, TextFormat("Now playing - %s", trackTitle));
+	GuiStatusBar(statusBounds, "Caudio - Lightweight performant music player...");
 	GuiToggle(pctl.pauseButtonBounds, "P", &pctl.isPaused);
 	GuiSlider(pctl.sliderBounds, "0", "100", &m.musicVolume, 0.0f, 1.0f);
 	GuiProgressBar(pctl.progressBarBounds, TextFormat("%d:%02d", m.elapsedMins, m.elapsedSecs),
